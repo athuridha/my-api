@@ -1,0 +1,45 @@
+name: Scrape OLX Properties
+
+on:
+  schedule:
+    # Run every day at 2 AM UTC (9 AM WIB)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+      
+      - name: Install dependencies
+        run: |
+          pip install selenium webdriver-manager psycopg2-binary python-dotenv
+      
+      - name: Run scraper
+        env:
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python scripts/scrape_job.py
+      
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-logs
+          path: logs/
+          retention-days: 7

@@ -1,36 +1,197 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PropData - Indonesia Property Data API
 
-## Getting Started
+Professional API platform for Indonesian property listing data.
 
-First, run the development server:
+## Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Frontend**: Next.js 16, React 19, Tailwind CSS
+- **Backend**: Next.js API Routes
+- **Database**: Supabase (PostgreSQL)
+- **Scraper**: Python + Selenium (GitHub Actions)
+- **Deployment**: Vercel (free tier)
+
+## Features
+
+- REST API for property data access
+- User dashboard with API key management
+- Authentication with API keys
+- Rate limiting per subscription tier
+- Data explorer to browse properties
+- Admin panel for owner management
+- Scheduled scraping (daily via GitHub Actions)
+- Analytics endpoint (Pro/Enterprise tier)
+
+## Quick Start
+
+### 1. Setup Supabase Database
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor** and run the contents of `supabase/schema.sql`
+3. Copy your project credentials
+
+### 2. Configure Environment
+
+Create `.env.local` file:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Install & Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000)
 
-## Learn More
+### 4. Create Owner Account
 
-To learn more about Next.js, take a look at the following resources:
+1. Register via the app at `/register`
+2. Go to Supabase SQL Editor and run `supabase/setup-owner.sql`
+3. Login and access Admin Panel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 5. Deploy to Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npx vercel
+```
 
-## Deploy on Vercel
+Or connect your GitHub repo to Vercel dashboard.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Add these environment variables in Vercel:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## API Documentation
+
+### Authentication
+
+Include your API key in the request header:
+
+```
+X-API-Key: olx_your_api_key_here
+```
+
+### Endpoints
+
+#### GET /api/v1/properties
+
+Get property listings with optional filters.
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| location | string | Filter by location (e.g., "jakarta") |
+| mode | string | "jual" (sale) or "sewa" (rent) |
+| min_price | number | Minimum price in IDR |
+| max_price | number | Maximum price in IDR |
+| bedrooms | number | Number of bedrooms |
+| limit | number | Results per page (max 100, default 20) |
+| offset | number | Pagination offset |
+
+**Example:**
+```bash
+curl -X GET "https://propdata.vercel.app/api/v1/properties?location=jakarta&mode=jual&limit=10" \
+  -H "X-API-Key: olx_xxxxx"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "properties": [...],
+    "pagination": {
+      "total": 1234,
+      "limit": 10,
+      "offset": 0,
+      "has_more": true
+    }
+  },
+  "meta": {
+    "requests_remaining": 49,
+    "tier": "free"
+  }
+}
+```
+
+#### GET /api/v1/locations
+
+Get list of available locations.
+
+#### GET /api/v1/analytics
+
+Get market statistics (Pro/Enterprise only).
+
+## Pricing Tiers
+
+| Tier | Requests/Month | Price |
+|------|----------------|-------|
+| Free | 50 | Rp 0 |
+| Basic | 500 | Rp 99,000 |
+| Pro | 2,000 | Rp 299,000 |
+| Enterprise | Unlimited | Custom |
+
+## GitHub Actions Setup (Scraper)
+
+To enable automated daily scraping:
+
+1. **Add Repository Secrets:**
+   - `SUPABASE_URL` - Your Supabase project URL
+   - `SUPABASE_SERVICE_KEY` - Supabase service role key (from Settings > API)
+
+2. **Enable GitHub Actions:**
+   The workflow at `.github/workflows/scrape.yml` runs daily at 2 AM UTC.
+
+3. **Manual Trigger:**
+   You can also trigger manually from Actions tab > "Run Scraper" > "Run workflow"
+
+## Project Structure
+
+```
+olx/
+├── app/
+│   ├── api/v1/
+│   │   ├── properties/route.ts    # Properties API
+│   │   ├── locations/route.ts     # Locations API
+│   │   └── analytics/route.ts     # Analytics API
+│   ├── dashboard/
+│   │   ├── page.tsx              # Main dashboard
+│   │   ├── api-keys/page.tsx     # API key management
+│   │   ├── explorer/page.tsx     # Data explorer
+│   │   └── settings/page.tsx     # User settings
+│   ├── admin/page.tsx            # Admin panel (owner only)
+│   ├── docs/page.tsx             # API documentation
+│   ├── login/page.tsx            # Login page
+│   ├── register/page.tsx         # Registration page
+│   └── page.tsx                  # Landing page
+├── lib/
+│   ├── supabase.ts               # Supabase client & types
+│   └── utils.ts                  # Utility functions
+├── supabase/
+│   ├── schema.sql                # Database schema
+│   └── setup-owner.sql           # Owner account setup
+├── scripts/
+│   └── scrape_job.py             # Python scraper for GitHub Actions
+└── .github/workflows/
+    └── scrape.yml                # GitHub Actions workflow
+```
+
+## Owner Account
+
+**Email:** amarathuridhaa@gmail.com  
+**Password:** Amar130803@
+
+After first login, run `supabase/setup-owner.sql` to activate owner privileges.
+
+## Support
+
+For questions or support, contact: support@propdata.id
+
+## License
+
+MIT License - See LICENSE file for details.
+
