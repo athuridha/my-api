@@ -34,13 +34,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Supabase connection
+# Supabase connection - try multiple env var names
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY")
+
+# PostgreSQL direct connection (alternative)
 try:
     import psycopg2
     from psycopg2.extras import execute_values
     POSTGRES_URL = os.environ.get("POSTGRES_URL")
 except ImportError:
-    logger.warning("psycopg2 not installed, database operations will be skipped")
+    logger.warning("psycopg2 not installed")
     POSTGRES_URL = None
 
 
@@ -297,10 +301,60 @@ def scrape_location(driver: webdriver.Chrome, slug: str, mode: str) -> List[Dict
 
 
 def save_to_database(records: List[Dict[str, Any]]) -> int:
-    """Save records to Supabase via direct PostgreSQL connection."""
-    if not POSTGRES_URL or not records:
+    """Save records to Supabase via REST API or direct PostgreSQL."""
+    if not records:
         return 0
     
+    # Try Supabase REST API first
+    if SUPABASE_URL and SUPABASE_KEY:
+        return save_via_supabase_api(records)
+    
+    # Fallback to PostgreSQL direct connection
+    if POSTGRES_URL:
+        return save_via_postgres(records)
+    
+    logger.error("No database connection configured!")
+    logger.error(f"SUPABASE_URL: {'set' if SUPABASE_URL else 'not set'}")
+    logger.error(f"SUPABASE_KEY: {'set' if SUPABASE_KEY else 'not set'}")
+    logger.error(f"POSTGRES_URL: {'set' if POSTGRES_URL else 'not set'}")
+    return 0
+
+
+def save_via_supabase_api(records: List[Dict[str, Any]]) -> int:
+    """Save records via Supabase REST API."""
+    import urllib.request
+    import urllib.error
+    
+    url = f"{SUPABASE_URL}/rest/v1/properties"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates"
+    }
+    
+    saved = 0
+    batch_size = 50
+    
+    for i in range(0, len(records), batch_size):
+        batch = records[i:i + batch_size]
+        data = json.dumps(batch).encode('utf-8')
+        
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+            with urllib.request.urlopen(req) as response:
+                saved += len(batch)
+                logger.info(f"Batch {i // batch_size + 1}: Saved {len(batch)} records")
+        except urllib.error.HTTPError as e:
+            logger.error(f"HTTP Error {e.code}: {e.read().decode()}")
+        except Exception as e:
+            logger.error(f"Error saving batch: {e}")
+    
+    return saved
+
+
+def save_via_postgres(records: List[Dict[str, Any]]) -> int:
+    """Save records via direct PostgreSQL connection."""
     try:
         conn = psycopg2.connect(POSTGRES_URL)
         cur = conn.cursor()
