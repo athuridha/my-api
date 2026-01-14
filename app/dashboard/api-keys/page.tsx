@@ -115,25 +115,38 @@ export default function ApiKeysPage() {
 
   const deleteKey = async (id: string) => {
     if (!confirm("Are you sure you want to delete this API key?")) return;
+    if (!user) return;
 
-    const { error } = await supabase.from("api_keys").delete().eq("id", id);
+    const { error } = await supabase
+      .from("api_keys")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
 
-    if (!error && user) {
+    if (!error) {
       fetchApiKeys(user.id);
+    } else {
+      console.error("Delete error:", error);
+      alert("Failed to delete API key");
     }
   };
 
   const regenerateKey = async (id: string) => {
     if (!confirm("Regenerate this API key? The old key will stop working immediately.")) return;
+    if (!user) return;
 
     const newKey = generateApiKey();
     const { error } = await supabase
       .from("api_keys")
       .update({ key: newKey })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user.id);
 
-    if (!error && user) {
+    if (!error) {
       fetchApiKeys(user.id);
+    } else {
+      console.error("Regenerate error:", error);
+      alert("Failed to regenerate API key");
     }
   };
 

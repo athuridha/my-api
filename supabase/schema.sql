@@ -146,6 +146,9 @@ CREATE POLICY "Users can insert own API keys" ON api_keys
 CREATE POLICY "Users can update own API keys" ON api_keys
     FOR UPDATE USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can delete own API keys" ON api_keys
+    FOR DELETE USING (auth.uid() = user_id);
+
 -- Properties policies (public read for API)
 CREATE POLICY "Anyone can read properties" ON properties
     FOR SELECT USING (true);
